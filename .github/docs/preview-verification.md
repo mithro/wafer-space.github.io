@@ -9,10 +9,9 @@ The preview verification system automatically tests PR preview sites to ensure t
 ## Verification Workflow
 
 ### Trigger
-- Runs automatically on pull requests (opened, synchronized, reopened)
-- Uses `pull_request` trigger with built-in wait logic for deployment readiness
-- Waits up to 5 minutes for preview deployment to complete before starting verification
-
+- Runs via `workflow_run` after a successful `PR Preview Deploy` run (see `.github/workflows/pr-preview.md`)
+- Because it is a `workflow_run` workflow, GitHub always runs the copy on `main`, and its runs appear in the Actions tab rather than in the PR's checks
+- Can also be started by hand with `workflow_dispatch`, giving a PR number and preview URL
 ### Verification Checks
 
 1. **Basic Connectivity**
