@@ -107,3 +107,4 @@ For site content updates, please submit a pull request. For theme-related issues
 ## License
 
 The website content (excluding the theme) is copyright Wafer Space. The Jekyll theme in `_theme/` is proprietary and not licensed for redistribution.
+<!-- Test: fork PR preview via github-actions (#80) -->
