@@ -127,6 +127,13 @@ jobs:
           # Don't leave this job's write token in .git/config, where code
           # from the PR could read it
           persist-credentials: false
+          # actions/checkout refuses fork code in workflow_run unless told
+          # otherwise. Building fork PRs is this workflow's purpose: fork PRs
+          # changing _plugins/ or .github/ are blocked above, and the next
+          # steps replace every file that can run code during the build
+          # (_plugins, Gemfile, .bundle, .gitmodules, _config overrides)
+          # with main's copies
+          allow-unsafe-pr-checkout: true
 
       # SECURITY: Every script, template and overlay file used from here on
       # comes from this copy of main, never from the PR's checkout. The
