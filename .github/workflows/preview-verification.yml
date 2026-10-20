@@ -5,22 +5,21 @@
 name: Preview Site Verification
 
 on:
-  # Trigger after preview deployment completes
-  workflow_run:
-    workflows: ["PR Preview Deploy"]
-    types: [completed]
-
-  # Manual trigger for testing
+  # Started by pr-preview-deploy.yml once a preview is deployed, or by hand.
+  # It can't use workflow_run: that event gives no way to find the PR when
+  # the triggering run is itself a workflow_run run on the default branch.
   workflow_dispatch:
     inputs:
       pr_number:
         description: 'PR number to verify'
         required: true
-        default: '3'
       preview_url:
         description: 'Preview URL to verify'
         required: true
-        default: 'https://preview.wafer.space/pr-3/'
+      head_sha:
+        description: 'Commit the preview should be built from (default: the PR head)'
+        required: false
+        default: ''
 
 permissions:
   contents: read
@@ -29,15 +28,13 @@ permissions:
 
 jobs:
   verify-preview:
-    # Only run if deployment succeeded and there's a PR associated
-    if: >
-      (github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch') &&
-      (github.event.workflow_run.pull_requests[0].number != null || github.event_name == 'workflow_dispatch')
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Get PR information
         id: pr-info
@@ -46,50 +43,39 @@ jobs:
         env:
           INPUT_PR_NUMBER: ${{ github.event.inputs.pr_number }}
           INPUT_PREVIEW_URL: ${{ github.event.inputs.preview_url }}
+          INPUT_HEAD_SHA: ${{ github.event.inputs.head_sha }}
         with:
           script: |
-            // Handle manual workflow dispatch
-            if (context.eventName === 'workflow_dispatch') {
-              const prNumber = process.env.INPUT_PR_NUMBER;
-              const previewUrl = process.env.INPUT_PREVIEW_URL;
-
-              console.log(`Manual trigger - PR Number: ${prNumber}`);
-              console.log(`Manual trigger - Preview URL: ${previewUrl}`);
-
-              core.setOutput('pr_number', prNumber);
-              core.setOutput('preview_url', previewUrl);
-              core.setOutput('pr_title', 'Manual Verification');
-              core.setOutput('head_sha', context.sha);
-
+            const prNumber = process.env.INPUT_PR_NUMBER;
+            const previewUrl = process.env.INPUT_PREVIEW_URL;
+            if (!/^[0-9]{1,5}$/.test(prNumber)) {
+              core.setFailed(`Invalid PR number: ${prNumber}`);
+              return;
+            }
+            if (!/^https:\/\/[A-Za-z0-9.-]+(\/[A-Za-z0-9._\/-]*)?$/.test(previewUrl)) {
+              core.setFailed(`Invalid preview URL: ${previewUrl}`);
               return;
             }
 
-            // Handle workflow_run trigger - get PR info from event
-            const prNumber = context.payload.workflow_run.pull_requests[0].number;
-            const previewUrl = `https://preview.wafer.space/pr-${prNumber}/`;
-
-            console.log(`Workflow run trigger - PR Number: ${prNumber}`);
-            console.log(`Preview URL: ${previewUrl}`);
-
-            // Fetch current PR data from GitHub API
             const { data: pullRequest } = await github.rest.pulls.get({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              pull_number: prNumber
+              pull_number: Number(prNumber)
             });
+            const headSha = process.env.INPUT_HEAD_SHA || pullRequest.head.sha;
+            if (!/^[0-9a-f]{40}$/.test(headSha)) {
+              core.setFailed(`Invalid head SHA: ${headSha}`);
+              return;
+            }
 
-            const currentHeadSha = pullRequest.head.sha;
-            const prTitle = pullRequest.title;
+            console.log(`PR #${prNumber}: ${pullRequest.title}`);
+            console.log(`Preview URL: ${previewUrl}`);
+            console.log(`Expected commit: ${headSha}`);
 
-            console.log(`PR Title: ${prTitle}`);
-            console.log(`Current HEAD SHA: ${currentHeadSha}`);
-            console.log(`✅ Proceeding with verification`);
-
-            // Set outputs for subsequent steps
             core.setOutput('pr_number', prNumber);
             core.setOutput('preview_url', previewUrl);
-            core.setOutput('pr_title', prTitle);
-            core.setOutput('head_sha', currentHeadSha);
+            core.setOutput('pr_title', pullRequest.title);
+            core.setOutput('head_sha', headSha);
       
       - name: Wait for preview deployment to complete
         if: steps.pr-info.outputs.pr_number
