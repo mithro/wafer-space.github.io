@@ -18,7 +18,7 @@ Previews are built in two stages so that pull requests from forks get previews t
 2. **Stage 2, `pr-preview-deploy.yml` (`workflow_run`, trusted):** runs from `main` with the secrets once Stage 1 finishes. It finds the PR using only the event's head repository, branch and SHA, checked against the GitHub API, and then:
    - blocks fork PRs that change `_plugins/` or `.github/`, and comments to explain why;
    - takes every script and template it runs from a separate checkout of `main`, never from the PR;
-   - for other fork PRs, replaces `_plugins/`, `Gemfile`, `Gemfile.lock` and `.gitmodules` with the copies from `main`, removes `.bundle/`, and pins `plugins_dir`, `source` and `destination`;
+   - for other fork PRs, replaces `_plugins/`, `Gemfile` and `.gitmodules` with the copies from `main`, removes `.bundle/` and any `Gemfile.lock` (it is gitignored, so `main` has none), and pins `plugins_dir`, `source` and `destination`;
    - builds with the private theme, deploys to `/pr-[number]/`, comments the preview URL and starts the link check.
 3. **Verification, `preview-verification.yml` (`workflow_dispatch`):** started by Stage 2 with the PR number, preview URL and commit, and comments the link check results. It can also be run by hand from the Actions tab.
 4. Previews update on every push and are removed by `cleanup-previews.yml` when the PR closes.

@@ -150,7 +150,8 @@ jobs:
       # the build with trusted versions from main:
       # - _plugins/ (Ruby code Jekyll runs), including files the fork had
       #   before this PR, which don't appear in the PR diff
-      # - Gemfile and Gemfile.lock (gems Bundler installs and loads)
+      # - Gemfile (gems Bundler installs and loads); any Gemfile.lock is
+      #   removed, as main has none
       # - .bundle/ (Bundler config could point BUNDLE_GEMFILE elsewhere)
       # - .gitmodules (where the theme submodule is fetched from)
       # and stack a config that stops _config.yml redirecting plugins_dir,
@@ -173,14 +174,17 @@ jobs:
           cp -r _trusted_main/_plugins _plugins
           echo "✅ Replaced _plugins/ with trusted version from main"
 
-          if cmp -s Gemfile _trusted_main/Gemfile && cmp -s Gemfile.lock _trusted_main/Gemfile.lock; then
+          # Gemfile.lock is gitignored, so main has none. A fork could still
+          # commit one to pin gem versions or sources, so remove it.
+          if cmp -s Gemfile _trusted_main/Gemfile && [ ! -e Gemfile.lock ]; then
             echo "gemfile_modified=false" >> $GITHUB_OUTPUT
           else
             echo "gemfile_modified=true" >> $GITHUB_OUTPUT
             echo "⚠️  Gemfile changes detected in fork PR"
           fi
-          cp _trusted_main/Gemfile _trusted_main/Gemfile.lock .
-          echo "✅ Using trusted Gemfile and Gemfile.lock from main"
+          cp _trusted_main/Gemfile .
+          rm -f Gemfile.lock
+          echo "✅ Using trusted Gemfile from main"
 
           rm -rf .bundle
           cp _trusted_main/.gitmodules .gitmodules
