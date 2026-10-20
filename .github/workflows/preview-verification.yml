@@ -160,7 +160,12 @@ jobs:
         run: |
           PREVIEW_URL="${{ steps.pr-info.outputs.preview_url }}"
           PR_NUMBER="${{ steps.pr-info.outputs.pr_number }}"
-          
+          # Split the preview URL into origin and path, e.g.
+          # https://preview.wafer.space and /pr-12 (or /preview.wafer.space/pr-12
+          # for a fork's previews served from a project Pages site)
+          PREVIEW_ORIGIN=$(echo "$PREVIEW_URL" | grep -oE '^https://[^/]+')
+          PREVIEW_PATH=$(echo "$PREVIEW_URL" | sed -E 's#^https://[^/]+##; s#/+$##')
+
           echo "Starting comprehensive verification of: $PREVIEW_URL"
           
           # Create verification report
@@ -205,9 +210,9 @@ jobs:
           fi
           
           # Check for baseurl configuration (flexible check for different implementations)
-          if echo "$CONTENT" | grep -q "window.siteBaseurl = '/pr-$PR_NUMBER'"; then
+          if echo "$CONTENT" | grep -qF "window.siteBaseurl = '$PREVIEW_PATH'"; then
             echo "- ✅ JavaScript baseurl configuration found" >> $REPORT_FILE
-          elif echo "$CONTENT" | grep -qE "(src|href)=\"/pr-$PR_NUMBER/"; then
+          elif echo "$CONTENT" | grep -qE "(src|href)=\"$PREVIEW_PATH/"; then
             echo "- ✅ Assets use correct PR baseurl paths" >> $REPORT_FILE
           else
             echo "- ⚠️  Baseurl configuration not detected (checking asset accessibility)" >> $REPORT_FILE
@@ -262,8 +267,8 @@ jobs:
             else
               # Handle both relative and absolute paths
               if [[ "$page_path" == /* ]]; then
-                # For absolute paths like /pr-46/about.html, use them directly with the domain
-                PAGE_URL="https://preview.wafer.space$page_path"
+                # For absolute paths like /pr-46/about.html, use them directly with the origin
+                PAGE_URL="$PREVIEW_ORIGIN$page_path"
               else
                 # For relative paths like how.html, append to PREVIEW_URL
                 PAGE_URL="$PREVIEW_URL$page_path"
@@ -287,7 +292,7 @@ jobs:
                 if [ -n "$asset_path" ]; then
                   # Handle relative vs absolute paths
                   if [[ "$asset_path" == /* ]]; then
-                    FULL_ASSET_URL="https://preview.wafer.space$asset_path"
+                    FULL_ASSET_URL="$PREVIEW_ORIGIN$asset_path"
                   else
                     FULL_ASSET_URL="$PREVIEW_URL$asset_path"
                   fi

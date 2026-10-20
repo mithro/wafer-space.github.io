@@ -33,6 +33,13 @@ jobs:
       github.event.workflow_run.conclusion == 'success' &&
       github.event.workflow_run.event == 'pull_request'
     runs-on: ubuntu-latest
+    env:
+      # Where previews are pushed and served. Repository variables let a
+      # fork deploy to its own preview repository, e.g. for testing changes
+      # to these workflows; a URL with a path (a project Pages site such as
+      # https://user.github.io/preview.wafer.space) is supported.
+      PREVIEW_REPOSITORY: ${{ vars.PREVIEW_REPOSITORY || 'wafer-space/preview.wafer.space' }}
+      PREVIEW_BASE_URL: ${{ vars.PREVIEW_BASE_URL || 'https://preview.wafer.space' }}
 
     steps:
       # SECURITY: Identify the PR from trusted data only. GitHub leaves
@@ -215,6 +222,16 @@ jobs:
             const prNumber = ${{ steps.pr.outputs.number }};
             const prTitle = process.env.PR_TITLE;
 
+            if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(process.env.PREVIEW_REPOSITORY)) {
+              throw new Error(`Invalid PREVIEW_REPOSITORY: ${process.env.PREVIEW_REPOSITORY}`);
+            }
+            if (!/^https:\/\/[A-Za-z0-9.-]+(\/[A-Za-z0-9._-]+)*\/?$/.test(process.env.PREVIEW_BASE_URL)) {
+              throw new Error(`Invalid PREVIEW_BASE_URL: ${process.env.PREVIEW_BASE_URL}`);
+            }
+            const baseUrl = process.env.PREVIEW_BASE_URL.replace(/\/+$/, '');
+            // '' for https://preview.wafer.space, '/repo' for a project Pages site
+            const basePath = new URL(baseUrl).pathname.replace(/\/+$/, '');
+
             // Main directory uses just PR number for simplicity
             const directoryName = `pr-${prNumber}`;
             // Slugified version for user-friendly redirect
@@ -222,11 +239,14 @@ jobs:
 
             console.log(`Main directory: ${directoryName}`);
             console.log(`Slugified redirect: ${slugifiedName}`);
+            console.log(`Preview URL: ${baseUrl}/${directoryName}/`);
 
             // Set outputs
             core.setOutput('directory_name', directoryName);
             core.setOutput('slugified_name', slugifiedName);
-            core.setOutput('baseurl_path', `/${directoryName}`);
+            core.setOutput('base_url', baseUrl);
+            core.setOutput('base_path', basePath);
+            core.setOutput('baseurl_path', `${basePath}/${directoryName}`);
 
             return directoryName;
 
@@ -264,8 +284,9 @@ jobs:
           SLUG_NAME="${{ steps.pr-directory.outputs.slugified_name }}"
           PR_NUM="${{ steps.pr.outputs.number }}"
           PR_SHA="${{ steps.pr.outputs.sha }}"
+          BASE_PATH="${{ steps.pr-directory.outputs.base_path }}"
 
-          echo "🚀 Deploying to preview.wafer.space..."
+          echo "🚀 Deploying to $PREVIEW_REPOSITORY..."
 
           # Setup SSH for preview repo
           eval $(ssh-agent -s)
@@ -276,7 +297,7 @@ jobs:
           chmod 600 ~/.ssh/known_hosts
 
           # Clone preview repository
-          git clone git@github.com:wafer-space/preview.wafer.space.git preview-repo
+          git clone "git@github.com:${PREVIEW_REPOSITORY}.git" preview-repo
           cd preview-repo
 
           # Configure git
@@ -291,13 +312,14 @@ jobs:
           if [ "$SLUG_NAME" != "$DIR_NAME" ]; then
             mkdir -p "$SLUG_NAME"
             cp "/tmp/pr-github-${DIR_NAME}/templates/redirect-template.html" "$SLUG_NAME/index.html"
-            sed -i "s|{{TARGET_URL}}|/${DIR_NAME}|g" "$SLUG_NAME/index.html"
+            sed -i "s|{{TARGET_URL}}|${BASE_PATH}/${DIR_NAME}|g" "$SLUG_NAME/index.html"
             echo "Created redirect from $SLUG_NAME to $DIR_NAME"
           fi
 
-          # Ensure CNAME file exists
-          if [ ! -f CNAME ]; then
-            echo "preview.wafer.space" > CNAME
+          # Ensure CNAME file exists when previews have their own domain
+          # (a project Pages site under a path uses its owner's domain)
+          if [ -z "$BASE_PATH" ] && [ ! -f CNAME ]; then
+            echo "$PREVIEW_BASE_URL" | sed -E 's#^https://##; s#/.*$##' > CNAME
           fi
 
           # Generate preview index page
@@ -327,7 +349,7 @@ jobs:
         if: steps.pr.outputs.deployment_allowed == 'true'
         id: verify-deployment
         run: |
-          PREVIEW_URL="https://preview.wafer.space/pr-${{ steps.pr.outputs.number }}/"
+          PREVIEW_URL="${{ steps.pr-directory.outputs.base_url }}/${{ steps.pr-directory.outputs.directory_name }}/"
           EXPECTED_COMMIT="${{ steps.pr.outputs.sha }}"
 
           echo "⏳ Waiting for GitHub Pages deployment..."
