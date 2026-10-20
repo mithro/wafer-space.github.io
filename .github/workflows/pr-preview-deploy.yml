@@ -237,7 +237,7 @@ jobs:
 
       - name: Setup Ruby and dependencies
         if: steps.security-check.outputs.deployment_allowed == 'true'
-        uses: ruby/setup-ruby@v1
+        uses: ruby/setup-ruby@4a9ddd6f338a97768b8006bf671dfbad383215f4
         with:
           ruby-version: '3.1'
           bundler-cache: true
@@ -284,7 +284,7 @@ jobs:
             CONFIG_FLAG="--config _config.yml,_config_security.yml"
             echo "🔒 Using security config override"
           fi
-          bundle exec jekyll build --baseurl "$BASEURL" $CONFIG_FLAG
+          bundle exec jekyll build --baseurl "$BASEURL" --future $CONFIG_FLAG
           echo "✅ Site built successfully"
         env:
           JEKYLL_ENV: production
