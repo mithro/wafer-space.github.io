@@ -9,9 +9,9 @@ The preview verification system automatically tests PR preview sites to ensure t
 ## Verification Workflow
 
 ### Trigger
-- Runs via `workflow_run` after a successful `PR Preview Deploy` run (see `.github/workflows/pr-preview.md`)
-- Because it is a `workflow_run` workflow, GitHub always runs the copy on `main`, and its runs appear in the Actions tab rather than in the PR's checks
-- Can also be started by hand with `workflow_dispatch`, giving a PR number and preview URL
+- Started with `workflow_dispatch` by `pr-preview-deploy.yml` once a preview is deployed, passing the PR number, preview URL and commit (see `.github/workflows/pr-preview.md`)
+- It runs from `main`, so its runs appear in the Actions tab rather than in the PR's checks
+- Can also be started by hand from the Actions tab, giving a PR number and preview URL. Leave the commit blank to use the PR's current head
 - muffet is pinned to a version and SHA256 checksum. `update-muffet.yml` checks weekly for a newer release and opens a pull request to update both
 ### Verification Checks
 
