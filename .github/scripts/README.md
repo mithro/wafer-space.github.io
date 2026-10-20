@@ -56,3 +56,5 @@ Preview deployment records and PR comments are created inline in `pr-preview-dep
 3. **Idempotent Operations**: Scripts can be run multiple times safely
 4. **Logging**: Detailed console output for debugging
 5. **Security**: Path validation and input sanitization throughout
+
+<!-- Test change: a fork PR touching .github/ should be blocked (wafer-space/wafer-space.github.io#80) -->
