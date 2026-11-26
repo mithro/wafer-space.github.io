@@ -114,7 +114,7 @@ jobs:
       # and redirects.json (loaded into Cloudflare), never the PR's.
       # workflow_run runs on the default branch, so this is its commit
       - name: Check out the preview root generator
-        if: github.repository == 'wafer-space/wafer-space.github.io'
+        if: true  # E2E TEST ONLY
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
         with:
           persist-credentials: false
@@ -135,7 +135,7 @@ jobs:
           pr-sha: ${{ needs.find-pr.outputs.sha }}
           # It writes wafer.space's preview list, so a copy of this
           # repository uses the action's default index instead
-          root-script: ${{ github.repository == 'wafer-space/wafer-space.github.io' && '.github/scripts/generate-preview-root.py' || '' }}
+          root-script: .github/scripts/generate-preview-root.py  # E2E TEST ONLY
 
       # workflow_dispatch is one of the two events GITHUB_TOKEN may trigger
       - name: Start link check
